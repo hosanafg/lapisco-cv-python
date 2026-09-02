@@ -73,3 +73,7 @@ fig.add_subplot(1,2,2)
 plt.imshow(img_new, cmap='gray')
 
 plt.show(block=True)
+
+#salvar a img_new
+img_final = Image.fromarray(img_new)
+img_final.save("arduino-equalized-pil.jpeg")
