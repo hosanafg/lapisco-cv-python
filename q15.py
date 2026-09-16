@@ -13,7 +13,7 @@ if not os.path.exists(pasta_destino):
 contador=1
 cap=cv2.VideoCapture(0)
 
-pressed_key=cv2.waitKey(1) & 0xFF
+pressed_key=cv2.waitKey(0) & 0xFF
 
 while(1):
     ret,frame=cap.read()
