@@ -1,7 +1,12 @@
+import numpy as np
+
 #PATH = "/home/hosanafg/Documentos/pessoal/lap/img.png" #path no meu computador pessoal. mudar em caso de troca de dispostivos
 PATH="/Users/hosana/Documents/lapisco-training-opencv-python/output/img.png"
 PATH_COLOR_IMG="/Users/hosana/Documents/lapisco-training-opencv-python/output/arduino.jpeg"
 PASTA_SAIDA = "/Users/hosana/Documents/lapisco-training-opencv-python/output/subimagens"
+
+ITERACOES=5
+KERNEL = np.ones((3, 3), np.uint8)  
 
 LARGURA, ALTURA = 640, 480
 LIMIAR = 30

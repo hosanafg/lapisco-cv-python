@@ -119,6 +119,36 @@ def crescimento_regioes(cinza, semente, rotulo, mapa_rotulos,
     return total
 
 
+
+# ----------------------------------------------------------------------------
+# Operações iterativas
+# ----------------------------------------------------------------------------
+def aplicar_iterativamente(binaria, operacao, n_iteracoes=ITERACOES, kernel=KERNEL):
+    """
+    Aplica 'operacao' (cv2.dilate ou cv2.erode) uma vez por iteração, sempre
+    sobre o resultado da iteração anterior.
+    """
+    resultados=[binaria]
+    atual=binaria
+    for _ in range(n_iteracoes):
+        atual=operacao(atual,kernel,iterations=1)
+        resultados.append(atual)
+    return resultados
+ 
+ 
+def imprimir_tabela(nome, resultados):
+    """Mostra a área branca em cada iteração e a variação em relação à anterior."""
+    print(f"\n{nome}")
+    print(f"{'iter':>4} | {'pixels brancos':>14} | {'variação':>9}")
+    print("=" * 20)
+    anterior = None
+    for i, img in enumerate(resultados):
+        total=contar_brancos(img)
+        variacao= "" if anterior is None else f"{total - anterior:+d}"
+        print(f"{i:>4} | {total:>14} | {variacao:>9}")
+        anterior = total
+
+
 # ----------------------------------------------------------------------------
 # Detecção automática de regiões
 # ----------------------------------------------------------------------------
