@@ -187,3 +187,81 @@ def mostrar_subimagens(subimagens, escala_minima=150):
         cv2.moveWindow(nome, 40 + 40 * (i % 10), 40 + 40 * (i % 10))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def calcular_bordas(cinza):
+    """Mapa de bordas (Canny), apenas para visualização e validação."""
+    suave = cv2.GaussianBlur(cinza, (5, 5), 1.5)
+    return cv2.Canny(suave, CANNY_ALTO // 2, CANNY_ALTO)
+ 
+ 
+def apoio_do_contorno(bordas, cx, cy, r, pontos=360, tolerancia=2):
+    """
+    Fração (0 a 1) dos pontos do contorno do círculo (cx, cy, r) que caem
+    sobre pixels de borda (com uma pequena tolerância em pixels).
+    Um círculo de verdade tem contorno quase todo sobre bordas; um falso
+    positivo (cantos arredondados, arcos parciais) tem pouco apoio.
+    """
+    altura, largura = bordas.shape
+    # Dilata as bordas para tolerar erros de 1-2 pixels na posição
+    k = 2 * tolerancia + 1
+    bordas_dil = cv2.dilate(bordas, np.ones((k, k), np.uint8))
+ 
+    angulos = np.linspace(0, 2 * np.pi, pontos, endpoint=False)
+    xs = np.round(cx + r * np.cos(angulos)).astype(int)
+    ys = np.round(cy + r * np.sin(angulos)).astype(int)
+ 
+    dentro = (xs >= 0) & (xs < largura) & (ys >= 0) & (ys < altura)
+    if not dentro.any():
+        return 0.0
+    # Pontos fora da imagem contam como "sem apoio"
+    apoiados = bordas_dil[ys[dentro], xs[dentro]] > 0
+    return float(apoiados.sum()) / pontos
+ 
+ 
+def detectar_circulo(cinza):
+    """
+    Aplica a Transformada de Hough para círculos e devolve (x, y, raio, apoio)
+    do círculo mais forte e válido, ou None se não houver círculo.
+    """
+    suave = cv2.GaussianBlur(cinza, (9, 9), 2)
+    circulos = cv2.HoughCircles(
+        suave,
+        cv2.HOUGH_GRADIENT,
+        dp=1.2,
+        minDist=cinza.shape[0],      # no máximo 1 círculo (distância mínima enorme)
+        param1=CANNY_ALTO,
+        param2=LIMIAR_ACUMULADOR,
+        minRadius=RAIO_MIN,
+        maxRadius=RAIO_MAX,
+    )
+    if circulos is None:
+        return None
+ 
+    bordas = calcular_bordas(cinza)
+    melhor = None
+    for cx, cy, r in circulos[0]:        # já vêm ordenados por votos
+        apoio = apoio_do_contorno(bordas, cx, cy, r)
+        if apoio >= APOIO_MINIMO and (melhor is None or apoio > melhor[3]):
+            melhor = (int(round(cx)), int(round(cy)), int(round(r)), apoio)
+    return melhor
+ 
+ 
+# ----------------------------------------------------------------------------
+# Visualização - CIRCULO
+# ----------------------------------------------------------------------------
+def desenhar_circulo(img_bgr, circulo):
+    """Desenha contorno (verde) e centro (vermelho) do círculo detectado."""
+    saida = img_bgr.copy()
+    cx, cy, r, _ = circulo
+    cv2.circle(saida, (cx, cy), r, (0, 255, 0), 3)
+    cv2.circle(saida, (cx, cy), 3, (0, 0, 255), -1)
+    return saida
+ 
+ 
+def sinalizar_sem_circulo(img_bgr):
+    """Escreve um aviso na imagem quando nenhum círculo é encontrado."""
+    saida = img_bgr.copy()
+    cv2.putText(saida, "Nenhum circulo detectado", (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+    return saida

@@ -1,4 +1,5 @@
-PATH = "/home/hosanafg/Documentos/pessoal/lap/img.png" #path no meu computador pessoal. mudar em caso de troca de dispostivos
+#PATH = "/home/hosanafg/Documentos/pessoal/lap/img.png" #path no meu computador pessoal. mudar em caso de troca de dispostivos
+PATH="/Users/hosana/Documents/lapisco-training-opencv-python/img.png"
 PATH_COLOR_IMG="/Users/hosana/Documents/lapisco-training-opencv-python/output/arduino.jpeg"
 PASTA_SAIDA = "/Users/hosana/Documents/lapisco-training-opencv-python/output/subimagens"
 
@@ -11,3 +12,10 @@ CORES = {
     2: (255, 0, 0),   # azul
     3: (0, 255, 0),   # verde
 }
+
+# Parâmetros do Canny / Hough (ajuste conforme sua imagem)
+CANNY_ALTO = 100         
+LIMIAR_ACUMULADOR = 40   # quanto menor, mais círculos (e falsos positivos)
+RAIO_MIN = 10
+RAIO_MAX = 0             # 0 = sem limite
+APOIO_MINIMO = 0.75     
