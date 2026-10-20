@@ -15,7 +15,8 @@ Teclas: R = reiniciar | S = salvar resultado | ESC/Q = sair
  
 import sys
 from collections import deque
- 
+
+from variables import *
 import cv2
 import numpy as np
  
@@ -151,7 +152,6 @@ class SegmentadorInterativo:
  
  
 def main():
-    PATH = "/home/hosanafg/Documentos/pessoal/lap/img.png" #path no meu computador pessoal. mudar em caso de troca de dispostivos
     img = carregar_imagem(PATH)
     SegmentadorInterativo(img).executar(img)
  
