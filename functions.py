@@ -26,6 +26,7 @@ def binarizar_otsu(cinza):
     _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return binaria
 
+
 def detectar_bordas_canny(cinza, baixo=CANNY_BAIXO, alto=CANNY_ALTO):
     """
     Suaviza a imagem e aplica Canny. Em seguida faz um fechamento morfológico
@@ -34,7 +35,7 @@ def detectar_bordas_canny(cinza, baixo=CANNY_BAIXO, alto=CANNY_ALTO):
     """
     suave = cv2.GaussianBlur(cinza, (5, 5), 1.4)
     bordas = cv2.Canny(suave, baixo, alto)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     return cv2.morphologyEx(bordas, cv2.MORPH_CLOSE, kernel)
 
  
@@ -127,6 +128,48 @@ def encontrar_sementes_e_segmentar(binaria):  #subst dos cliques do mouse
     return mapa_rotulos, rotulo
 
 
+
+# ----------------------------------------------------------------------------
+# CRIAR E CÁLCULAR ÁREA: retângulos
+# ----------------------------------------------------------------------------
+def obter_retangulos(contornos):
+    """
+    Percorre todos os contornos e devolve o retângulo (x, y, largura, altura)
+    de cada um, na mesma ordem da lista de contornos.
+    """
+    return [cv2.boundingRect(contorno) for contorno in contornos]
+ 
+ 
+def desenhar_retangulos(img_bgr, retangulos):
+    saida = img_bgr.copy()
+    for i, (x, y, w, h) in enumerate(retangulos, start=1):
+        cv2.rectangle(saida, (x, y), (x + w, y + h), (0, 0, 255), 2)
+        cv2.putText(saida, str(i), (x, max(y - 6, 18)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+    return saida
+ 
+
+def calcular_areas(contornos):
+    return [cv2.contourArea(contorno) for contorno in contornos]
+ 
+ 
+def escrever_areas(img_bgr, retangulos, areas):
+    saida = img_bgr.copy()
+    altura = saida.shape[0]
+    for (x, y, w, h), area in zip(retangulos, areas):
+        ty = min(y + h + 20, altura - 6)
+        cv2.putText(saida, f"A={area:.0f}", (x, ty),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2, cv2.LINE_AA)
+    return saida
+ 
+ 
+def imprimir_tabela(retangulos, areas):
+    print(f"{'Obj':>3} | {'x':>4} {'y':>4} {'larg':>5} {'alt':>5} | {'área (px²)':>10}")
+    print("=" *20 )
+    for i, ((x, y, w, h), area) in enumerate(zip(retangulos, areas), start=1):
+        print(f"{i:>3} | {x:>4} {y:>4} {w:>5} {h:>5} | {area:>10.1f}")
+
+
 # ----------------------------------------------------------------------------
 # Cores e visualização
 # ----------------------------------------------------------------------------
@@ -145,12 +188,14 @@ def colorir_regioes(cinza, mapa_rotulos, cores=CORES):
     for rotulo, cor in cores.items():
         saida[mapa_rotulos == rotulo] = cor
     return saida
+
  
 def colorir_regioes_automatico(mapa_rotulos, total, cor_fundo=(255, 255, 255)):
     saida = np.full((*mapa_rotulos.shape, 3), cor_fundo, dtype=np.uint8)
     for rotulo, cor in enumerate(gerar_cores_distintas(total), start=1):
         saida[mapa_rotulos == rotulo] = cor
     return saida
+
  
 def escrever_numeros(img_bgr, mapa_rotulos, total):
     for rotulo in range(1, total + 1):
@@ -198,7 +243,7 @@ def extrair_todas_subimagens(img_bgr, mapa_rotulos, total, margem=5):
  
  
 # ----------------------------------------------------------------------------
-# Saída
+# Output
 # ----------------------------------------------------------------------------
 def salvar_subimagens(subimagens, pasta=PASTA_SAIDA):
     os.makedirs(pasta, exist_ok=True)
@@ -252,7 +297,6 @@ def apoio_do_contorno(bordas, cx, cy, r, pontos=360, tolerancia=2):
     return float(apoiados.sum()) / pontos
 
 
- 
 def detectar_circulo(cinza):
     """
     Aplica a Transformada de Hough para círculos e devolve (x, y, raio, apoio)
