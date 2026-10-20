@@ -17,91 +17,11 @@ import sys
 from collections import deque
 
 from variables import *
+from functions import *
+
 import cv2
 import numpy as np
- 
-LARGURA, ALTURA = 640, 480
-LIMIAR = 30
-CONECTIVIDADE = 8     # 4 ou 8 vizinhos
-
-CORES = {
-    1: (0, 0, 255),   # vermelho
-    2: (255, 0, 0),   # azul
-    3: (0, 255, 0),   # verde
-}
-
-# ----------------------------------------------------------------------------
-# Imagem
-# ----------------------------------------------------------------------------
-def carregar_imagem(caminho):
-    img = cv2.imread(caminho, cv2.IMREAD_COLOR)
-    if img is None:
-        raise FileNotFoundError(f"Não foi possível abrir '{caminho}'.")
-    if img.shape[:2] != (ALTURA, LARGURA):
-        img = cv2.resize(img, (LARGURA, ALTURA), interpolation=cv2.INTER_NEAREST)
-    return img
-    
-def converter_para_cinza(img_bgr):
-    """Converte a imagem colorida para tons de cinza."""
-    return cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
- 
-# ----------------------------------------------------------------------------
-# Region Growing
-# ----------------------------------------------------------------------------
-def obter_vizinhos(y, x, altura, largura, conectividade=8):
-    """Retorna os vizinhos (y, x) válidos de um pixel."""
-    if conectividade == 4:
-        deslocamentos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    else:
-        deslocamentos = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
-                         (0, 1), (1, -1), (1, 0), (1, 1)]
-    for dy, dx in deslocamentos:
-        ny, nx = y + dy, x + dx                             #percorre os vizinhos da imagen
-        if 0 <= ny < altura and 0 <= nx < largura:          #em caso do px estar na borda da img 
-            yield ny, nx                                    #FIFO
-
- 
-def crescimento_regioes(cinza, semente, rotulo, mapa_rotulos,
-                        limiar=LIMIAR, conectividade=CONECTIVIDADE):
-    """
-    Cresce uma região a partir de 'semente' = (x, y).
- 
-    Critério de similaridade: |I(p) - I(semente)| <= limiar
-    Só considera pixels AINDA NAO ROTULADOS (mapa_rotulos inicial todo == 0).
-    Atualiza 'mapa_rotulos' e retorna a quantidade de pixels da região.
-    """
-    altura, largura = cinza.shape
-    x, y = semente
- 
-    if mapa_rotulos[y, x] != 0:
-        return 0  # semente já pertence a outra região
- 
-    valor_semente = int(cinza[y, x])
-    fila = deque([(y, x)])
-    mapa_rotulos[y, x] = rotulo
-    total = 1
- 
-    while fila:
-        cy, cx = fila.popleft()
-        for ny, nx in obter_vizinhos(cy, cx, altura, largura, conectividade):
-            if mapa_rotulos[ny, nx] == 0 and abs(int(cinza[ny, nx]) - valor_semente) <= limiar:
-                mapa_rotulos[ny, nx] = rotulo
-                fila.append((ny, nx))
-                total += 1
-    return total
- 
- 
-# ----------------------------------------------------------------------------
-# Visualização
-# ----------------------------------------------------------------------------
-def colorir_regioes(cinza, mapa_rotulos, cores=CORES):
-    """Gera imagem BGR: fundo em cinza, regiões pintadas com sua cor."""
-    saida = cv2.cvtColor(cinza, cv2.COLOR_GRAY2BGR)
-    for rotulo, cor in cores.items():
-        saida[mapa_rotulos == rotulo] = cor
-    return saida
- 
- 
+  
 # ----------------------------------------------------------------------------
 # Classes
 # ----------------------------------------------------------------------------
