@@ -1,160 +1,99 @@
-"""
-Crescimento de Regiões (Region Growing) com múltiplas sementes.
- 
-- Abre uma imagem colorida (640x480, objetos pretos em fundo branco)
-- Converte para tons de cinza
-- Cada clique do mouse define uma semente:
-    1º clique -> região 1 (vermelho)
-    2º clique -> região 2 (azul)
-    3º clique -> região 3 (verde)
-- Pixels que não pertencem a nenhum objeto permanecem com rótulo 0
- 
- 
-Teclas: R = reiniciar | S = salvar resultado | ESC/Q = sair
-"""
- 
+import colorsys
 import sys
-from collections import deque
  
 import cv2
 import numpy as np
- 
-LARGURA, ALTURA = 640, 480
-LIMIAR = 30
-CONECTIVIDADE = 8     # 4 ou 8 vizinhos
 
-CORES = {
-    1: (0, 0, 255),   # vermelho
-    2: (255, 0, 0),   # azul
-    3: (0, 255, 0),   # verde
-}
+#importa as funcoes de region growing da questao 25 
+from q25 import (
+    carregar_imagem,
+    converter_para_cinza,
+    crescimento_regioes,
+)
+
+from variables import *
 
 # ----------------------------------------------------------------------------
-# Imagem
+# Pré-processamento
 # ----------------------------------------------------------------------------
-def carregar_imagem(caminho):
-    img = cv2.imread(caminho, cv2.IMREAD_COLOR)
-    if img is None:
-        raise FileNotFoundError(f"Não foi possível abrir '{caminho}'.")
-    if img.shape[:2] != (ALTURA, LARGURA):
-        img = cv2.resize(img, (LARGURA, ALTURA), interpolation=cv2.INTER_NEAREST)
-    return img
-    
-def converter_para_cinza(img_bgr):
-    """Converte a imagem colorida para tons de cinza."""
-    return cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+def binarizar_otsu(cinza):
+    _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return binaria
  
 # ----------------------------------------------------------------------------
-# Region Growing
+# Detecção automática de regiões
 # ----------------------------------------------------------------------------
-def obter_vizinhos(y, x, altura, largura, conectividade=8):
-    """Retorna os vizinhos (y, x) válidos de um pixel."""
-    if conectividade == 4:
-        deslocamentos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    else:
-        deslocamentos = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
-                         (0, 1), (1, -1), (1, 0), (1, 1)]
-    for dy, dx in deslocamentos:
-        ny, nx = y + dy, x + dx                             #percorre os vizinhos da imagen
-        if 0 <= ny < altura and 0 <= nx < largura:          #em caso do px estar na borda da img 
-            yield ny, nx                                    #FIFO
-
- 
-def crescimento_regioes(cinza, semente, rotulo, mapa_rotulos,
-                        limiar=LIMIAR, conectividade=CONECTIVIDADE):
+def encontrar_sementes_e_segmentar(binaria):  #subst dos cliques do mouse
     """
-    Cresce uma região a partir de 'semente' = (x, y).
+    Varre a imagem em ordem de linhas; todo pixel de objeto (valor 0) que
+    ainda não tem rótulo é uma nova semente e dispara um region growing.
  
-    Critério de similaridade: |I(p) - I(semente)| <= limiar
-    Só considera pixels AINDA NAO ROTULADOS (mapa_rotulos inicial todo == 0).
-    Atualiza 'mapa_rotulos' e retorna a quantidade de pixels da região.
+    Retorna (mapa_rotulos, total_objetos).
     """
-    altura, largura = cinza.shape
-    x, y = semente
+    mapa_rotulos = np.zeros(binaria.shape, dtype=np.int32)  # 0 = fundo
+    rotulo = 0
  
-    if mapa_rotulos[y, x] != 0:
-        return 0  # semente já pertence a outra região
- 
-    valor_semente = int(cinza[y, x])
-    fila = deque([(y, x)])
-    mapa_rotulos[y, x] = rotulo
-    total = 1
- 
-    while fila:
-        cy, cx = fila.popleft()
-        for ny, nx in obter_vizinhos(cy, cx, altura, largura, conectividade):
-            if mapa_rotulos[ny, nx] == 0 and abs(int(cinza[ny, nx]) - valor_semente) <= limiar:
-                mapa_rotulos[ny, nx] = rotulo
-                fila.append((ny, nx))
-                total += 1
-    return total
+    for y, x in np.argwhere(binaria == 0):       # candidatos a semente. vai varrer a imagem e ver onde é 0 (argwhere)
+        if mapa_rotulos[y, x] != 0:              # já pertence a uma região
+            continue
+        rotulo += 1
+        # limiar=0: só entra quem tem exatamente o mesmo valor
+        crescimento_regioes(binaria, (x, y), rotulo, mapa_rotulos, limiar=0)
+    return mapa_rotulos, rotulo
  
  
 # ----------------------------------------------------------------------------
-# Visualização
+# Cores e visualização
 # ----------------------------------------------------------------------------
-def colorir_regioes(cinza, mapa_rotulos, cores=CORES):
-    """Gera imagem BGR: fundo em cinza, regiões pintadas com sua cor."""
-    saida = cv2.cvtColor(cinza, cv2.COLOR_GRAY2BGR)
-    for rotulo, cor in cores.items():
+def gerar_cores_distintas(n):
+    """Gera n cores BGR bem espaçadas no matiz (HSV)."""
+    cores=[]
+    for i in range(n):
+        r,g,b = colorsys.hsv_to_rgb(i / n, 0.9, 0.95)
+        cores.append((int(b * 255), int(g * 255), int(r * 255)))
+    return cores
+ 
+ 
+def colorir_regioes_automatico(mapa_rotulos, total, cor_fundo=(255, 255, 255)):
+    saida = np.full((*mapa_rotulos.shape, 3), cor_fundo, dtype=np.uint8)
+    for rotulo, cor in enumerate(gerar_cores_distintas(total), start=1):
         saida[mapa_rotulos == rotulo] = cor
     return saida
  
  
+def escrever_numeros(img_bgr, mapa_rotulos, total):
+    for rotulo in range(1, total + 1):
+        ys, xs = np.nonzero(mapa_rotulos == rotulo)
+        cx, cy = int(xs.mean()), int(ys.mean())
+        cv2.putText(img_bgr, str(rotulo), (cx - 8, cy + 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+    return img_bgr
+ 
+ 
 # ----------------------------------------------------------------------------
-# Classes
+# FLuxo principal
 # ----------------------------------------------------------------------------
-class SegmentadorInterativo:
-    def __init__(self, img_bgr, max_regioes=3):
-        self.cinza = converter_para_cinza(img_bgr)
-        self.max_regioes = max_regioes
-        self.reiniciar()
- 
-    def reiniciar(self):
-        self.mapa_rotulos=np.zeros(self.cinza.shape, dtype=np.uint8)  #inicia o mapa_rotulos q vai ser passado na funcao crescimento_regioes
-        self.proximo_rotulo = 1
-        self.resultado = colorir_regioes(self.cinza, self.mapa_rotulos)
- 
-    def ao_clicar(self, evento, x, y):
-        if evento != cv2.EVENT_LBUTTONDOWN:
-            return
-        if self.proximo_rotulo > self.max_regioes:
-            print("Número máximo de regiões atingido (tecle R para reiniciar).")
-            return
- 
-        n = crescimento_regioes(self.cinza, (x, y), self.proximo_rotulo,
-                                self.mapa_rotulos)
-        if n == 0:
-            print("Esse pixel já pertence a uma região. Clique em outro objeto.")
-            return
- 
-        print(f"Região {self.proximo_rotulo}: semente=({x}, {y}), {n} pixels")
-        self.proximo_rotulo += 1
-        self.resultado = colorir_regioes(self.cinza, self.mapa_rotulos)
- 
-    def executar(self, img_bgr):
-        cv2.namedWindow("Region Growing")
-        cv2.setMouseCallback("Region Growing", self.ao_clicar)
-        while True:
-            lado_a_lado = np.hstack([img_bgr, self.resultado])
-            cv2.imshow("Region Growing", lado_a_lado)
-            tecla = cv2.waitKey(20) & 0xFF
-            if tecla in (27, ord("q")):
-                break
-            if tecla == ord("r"):
-                self.reiniciar()
-            if tecla == ord("s"):
-                cv2.imwrite("resultado.png", self.resultado)
-                np.save("mapa_rotulos.npy", self.mapa_rotulos)
-                print("Salvo: resultado.png e mapa_rotulos.npy")
-        cv2.destroyAllWindows()
- 
- 
 def main():
-    PATH = "/home/hosanafg/Documentos/pessoal/lap/img.png" #path no meu computador pessoal. mudar em caso de troca de dispostivos
-    img = carregar_imagem(PATH)
-    SegmentadorInterativo(img).executar(img)
+    img=carregar_imagem(PATH)
+    cinza=converter_para_cinza(img)
+    binaria=binarizar_otsu(cinza)
+ 
+    mapa_rotulos, total = encontrar_sementes_e_segmentar(binaria)
+    print(f"Objetos encontrados: {total}")
+    for rotulo in range(1, total + 1):
+        print(f"  Região {rotulo}: {np.count_nonzero(mapa_rotulos == rotulo)} pixels")
+ 
+    resultado = colorir_regioes_automatico(mapa_rotulos, total)
+    resultado = escrever_numeros(resultado, mapa_rotulos, total)
+ 
+    cv2.imwrite("resultado_automatico.png", resultado)
+    np.save("mapa_rotulos_automatico.npy", mapa_rotulos)
+    print("Salvo: resultado_automatico.png e mapa_rotulos_automatico.npy")
+ 
+    cv2.imshow("Original | Resultado", np.hstack([img, resultado]))
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+ 
  
 if __name__ == "__main__":
     main()
- 
