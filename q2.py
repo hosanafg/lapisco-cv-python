@@ -1,11 +1,12 @@
-import cv2
+from functions import *
+from variables import *
 
-#ler img colorida
-image=cv2.imread("arduino.jpeg")
-#transf em grsc
-image_gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-#salvar e mostrar
-cv2.imwrite("arduino_gray.jpeg",image_gray)
-cv2.imshow("arduino grayscale",image_gray)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+caminho="/Users/hosana/Documents/lapisco-training-opencv-python/output/lagarto.jpeg"
+def main ():
+    image=carregar_imagem(caminho)
+    cinza=converter_para_cinza(image)
+
+    cv2.imwrite("arduino_gray.jpeg",cinza)
+    cv2.imshow("arduino grayscale",cinza)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
