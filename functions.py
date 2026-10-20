@@ -60,6 +60,19 @@ def desenhar_contornos(img_bgr, contornos):
     return saida
  
 
+#limiarizacao -> mover p functions.py depois 
+def deixar_objetos_brancos(binaria):
+    """
+    A dilatação cresce o BRANCO e a erosão o diminui. Para que isso signifique
+    "aumentar/diminuir os objetos", os objetos precisam ser brancos.
+    Se mais da metade da imagem é branca, o fundo é branco: inverte.
+    Retorna (imagem, foi_invertida).
+    """
+    if np.count_nonzero(binaria) > binaria.size / 2:
+        return cv2.bitwise_not(binaria), True
+    return binaria, False
+
+
 # ----------------------------------------------------------------------------
 # Region Growing
 # ----------------------------------------------------------------------------
@@ -126,7 +139,6 @@ def encontrar_sementes_e_segmentar(binaria):  #subst dos cliques do mouse
         # limiar=0: só entra quem tem exatamente o mesmo valor
         crescimento_regioes(binaria, (x, y), rotulo, mapa_rotulos, limiar=0)
     return mapa_rotulos, rotulo
-
 
 
 # ----------------------------------------------------------------------------
@@ -323,10 +335,13 @@ def detectar_circulo(cinza):
         if apoio >= APOIO_MINIMO and (melhor is None or apoio > melhor[3]):
             melhor = (int(round(cx)), int(round(cy)), int(round(r)), apoio)
     return melhor
- 
+
+  
+def contar_brancos(imagem):
+    return int(np.count_nonzero(imagem))
  
 # ----------------------------------------------------------------------------
-# Visualização - CIRCULO
+# Visualização
 # ----------------------------------------------------------------------------
 def desenhar_circulo(img_bgr, circulo):
     """Desenha contorno (verde) e centro (vermelho) do círculo detectado."""
@@ -338,8 +353,37 @@ def desenhar_circulo(img_bgr, circulo):
  
  
 def sinalizar_sem_circulo(img_bgr):
+
     """Escreve um aviso na imagem quando nenhum círculo é encontrado."""
     saida = img_bgr.copy()
     cv2.putText(saida, "Nenhum circulo detectado", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
     return saida
+
+
+def montar_painel(resultados, titulo, colunas=3, escala=0.5):
+    """Junta o resultado de cada iteração em uma única imagem, com legendas."""
+    quadros = []
+    for i, img in enumerate(resultados):
+        quadro = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        quadro = cv2.resize(quadro, None, fx=escala, fy=escala,
+                            interpolation=cv2.INTER_NEAREST)
+        legenda = "Original" if i == 0 else f"{titulo} - iteracao {i}"
+        cv2.rectangle(quadro, (0, 0), (quadro.shape[1] - 1, 24), (255, 255, 255), -1)
+        cv2.putText(quadro, f"{legenda} | brancos: {contar_brancos(img)}", (6, 17),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 200), 1, cv2.LINE_AA)
+        cv2.rectangle(quadro, (0, 0), (quadro.shape[1] - 1, quadro.shape[0] - 1),
+                      (150, 150, 150), 1)
+        quadros.append(quadro)
+ 
+    while len(quadros) % colunas:                    # completa a última linha
+        quadros.append(np.zeros_like(quadros[0]))
+    linhas = [np.hstack(quadros[i:i + colunas]) for i in range(0, len(quadros), colunas)]
+    return np.vstack(linhas)
+ 
+ 
+def salvar_iteracoes(resultados, prefixo, pasta=PASTA_SAIDA):
+    """Salva cada iteração como <prefixo>_<n>.png."""
+    os.makedirs(pasta, exist_ok=True)
+    for i, img in enumerate(resultados):
+        cv2.imwrite(os.path.join(pasta, f"{prefixo}_{i}.png"), img)
