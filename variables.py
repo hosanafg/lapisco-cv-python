@@ -13,9 +13,11 @@ CORES = {
     3: (0, 255, 0),   # verde
 }
 
-# Parâmetros do Canny / Hough (ajuste conforme sua imagem)
+# Parâmetros do Canny / Hough
 CANNY_ALTO = 100         
+CANNY_BAIXO = 50
 LIMIAR_ACUMULADOR = 40   # quanto menor, mais círculos (e falsos positivos)
 RAIO_MIN = 10
 RAIO_MAX = 0             # 0 = sem limite
 APOIO_MINIMO = 0.75     
+PERIMETRO_MINIMO = 20

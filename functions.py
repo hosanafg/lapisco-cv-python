@@ -17,13 +17,47 @@ def carregar_imagem(caminho):
         raise FileNotFoundError(f"ERRO AO ABRIR '{caminho}'.")
     return image
 
+
 def converter_para_cinza(img_bgr):
     return cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+
 
 def binarizar_otsu(cinza):
     _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return binaria
 
+def detectar_bordas_canny(cinza, baixo=CANNY_BAIXO, alto=CANNY_ALTO):
+    """
+    Suaviza a imagem e aplica Canny. Em seguida faz um fechamento morfológico
+    para unir pequenas falhas nas bordas, o que evita que um mesmo objeto
+    seja contado como mais de um.
+    """
+    suave = cv2.GaussianBlur(cinza, (5, 5), 1.4)
+    bordas = cv2.Canny(suave, baixo, alto)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    return cv2.morphologyEx(bordas, cv2.MORPH_CLOSE, kernel)
+
+ 
+def encontrar_contornos(bordas, perimetro_minimo=PERIMETRO_MINIMO):
+    """
+    Aplica findContours na imagem de bordas.
+    """
+    resultado = cv2.findContours(bordas, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contornos = resultado[-2]    # OpenCV 4 devolve 2 valores; OpenCV 3 devolve 3
+    return [c for c in contornos if cv2.arcLength(c, True) >= perimetro_minimo]
+
+
+def desenhar_contornos(img_bgr, contornos):
+    saida = img_bgr.copy()
+    cv2.drawContours(saida, contornos, -1, (0, 200, 0), 2)
+    for i, c in enumerate(contornos, start=1):
+        x, y, w, h = cv2.boundingRect(c)
+        cv2.putText(saida, str(i), (x + w // 2 - 8, y + h // 2 + 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2, cv2.LINE_AA)
+    cv2.putText(saida, f"Objetos: {len(contornos)}", (15, 35),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2, cv2.LINE_AA)
+    return saida
+ 
 
 # ----------------------------------------------------------------------------
 # Region Growing
@@ -203,7 +237,6 @@ def apoio_do_contorno(bordas, cx, cy, r, pontos=360, tolerancia=2):
     positivo (cantos arredondados, arcos parciais) tem pouco apoio.
     """
     altura, largura = bordas.shape
-    # Dilata as bordas para tolerar erros de 1-2 pixels na posição
     k = 2 * tolerancia + 1
     bordas_dil = cv2.dilate(bordas, np.ones((k, k), np.uint8))
  
@@ -217,7 +250,8 @@ def apoio_do_contorno(bordas, cx, cy, r, pontos=360, tolerancia=2):
     # Pontos fora da imagem contam como "sem apoio"
     apoiados = bordas_dil[ys[dentro], xs[dentro]] > 0
     return float(apoiados.sum()) / pontos
- 
+
+
  
 def detectar_circulo(cinza):
     """
